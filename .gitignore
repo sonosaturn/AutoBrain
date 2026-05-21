@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+ENV/
+
+# Database Locali (RAG / Graph)
+jarvis_db/
+graph.json
+graphify_db/
+
+# Audio Cache e Log
+audio_cache/
+*.mp3
+*.log
+
+# Credenziali e Configurazione Macchina
+.env
+.claude/
+.gitnexus/

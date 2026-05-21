@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+ENV/
+
+# Syncthing Temporary
+.stversions/
+
+# Database Locali (RAG / Graph)
+# Escludiamo i DB locali per evitare conflitti di lock e ridondanza. 
+# Verranno ricostruiti sul portatile tramite gli script di reindex.
+jarvis_db/
+graph.json
+
+# Audio Cache (Nomi file statici ma pesanti)
+audio_cache/
+*.mp3
+
+# Log Locali
+*.log
+
+# Credenziali e Configurazione Macchina (NON SINCRONIZZARE MAI)
+.env
+.claude/
+.git/
+.gitnexus/
