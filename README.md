@@ -20,6 +20,7 @@ The system uses a **Hub & Spoke** architecture with resource delegation:
 
 ## System Requirements
 
+- **Operating System: Windows** (Native support for Voice, UI, and Windows-specific automation)
 - Python 3.10+
 - Obsidian (for Knowledge Graph visualization)
 - Google Gemini API Key
@@ -50,12 +51,12 @@ cd AutoBrain
 ```
 
 ### 3. Automated Environment Setup
-We provide a script that handles the heavy lifting (creating the Virtual Environment and installing over 100+ dependencies listed in `requirements.txt`):
+We provide a script that handles the heavy lifting (creating the Virtual Environment and installing the core dependencies listed in `requirements.txt`):
 
 ```bash
 python setup_laptop.py
 ```
-*Wait for the script to finish. It will ensure all libraries like `google-genai`, `chromadb`, and `vosk` are ready.*
+*Wait for the script to finish. It will ensure all libraries like `google-genai`, `graphify`, and `vosk` are ready.*
 
 ### 4. Configuration (.env)
 You **must** create a file named `.env` in the root folder. Use the following template:
@@ -68,25 +69,24 @@ CONVO_VAULT_PATH=C:/Path/To/Your/Conversation_Vault
 > **Note:** Get your free API key at [Google AI Studio](https://aistudio.google.com/).
 
 ### 5. Adjust Launch Scripts Paths (.bat & .vbs)
-To make launching the ecosystem seamless, the repository includes several executable scripts (`start_brain.bat`, `run_jarvis.vbs`, `run_creative_leader.vbs`, etc.). However, these scripts contain hardcoded paths tailored to the original developer's machine.
+To make launching the ecosystem seamless, the repository includes several executable scripts.
+- **Root Scripts:** `start_brain.bat`, `start_brain.vbs`, `start_dashboard.bat`.
+- **Jarvis Module Scripts:** `jarvis/run_jarvis.vbs`, `jarvis/run_creative_leader.vbs`.
 
-Before running them:
-1. Open each `.vbs` and `.bat` file in a text editor (like Notepad or VS Code).
-2. Locate the absolute folder paths inside the code.
-3. Replace them with the actual paths pointing to where you cloned the AutoBrain repository on your local machine.
+Most paths have been normalized to be portable, but verify your `.env` is correct.
 
 ### 6. First Launch
-1.  **Initialize the Brain:** Run `start_brain.bat`. It will scan your documents and build the initial Knowledge Graph.
-2.  **Activate Jarvis:** Run `run_jarvis.vbs`. The Arc Reactor GUI will appear at the center of your screen when you call him.
+1.  **Initialize the Brain:** Run `start_brain.bat` in the root folder. It will scan your documents and build the initial Knowledge Graph.
+2.  **Activate Jarvis:** Run `run_jarvis.vbs` inside the `jarvis/` folder. The Arc Reactor GUI will appear at the center of your screen when you call him.
 
 ## Usage
 
 - **Start the Brain (Data Indexing):**
-  Run `start_brain.vbs` or execute `python brain.py` to start the file watcher that indexes new PDFs and Markdown files in real-time.
+  Run `start_brain.vbs` (root) or execute `python autobrain_core/brain.py`.
 - **Start Jarvis (Voice Assistant):**
-  Run `run_jarvis.vbs` to start the voice assistant and the GUI in the background.
+  Run `jarvis/run_jarvis.vbs` to start the voice assistant and the GUI.
 - **Auto-Improvement:**
-  Add `run_creative_leader.vbs` to your Windows Startup folder to enable the background self-evolution cycle.
+  Run `jarvis/run_creative_leader.vbs` to enable the background self-evolution cycle.
 
 ## Customization & Configuration
 
