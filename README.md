@@ -51,6 +51,7 @@ cd AutoBrain
 
 ### 3. Automated Environment Setup
 We provide a script that handles the heavy lifting (creating the Virtual Environment and installing over 100+ dependencies listed in `requirements.txt`):
+
 ```bash
 python setup_laptop.py
 ```
@@ -58,6 +59,7 @@ python setup_laptop.py
 
 ### 4. Configuration (.env)
 You **must** create a file named `.env` in the root folder. Use the following template:
+
 ```env
 GEMINI_API_KEY=your_free_google_ai_studio_key
 VAULT_PATH=C:/Path/To/Your/University_Vault
@@ -65,7 +67,15 @@ CONVO_VAULT_PATH=C:/Path/To/Your/Conversation_Vault
 ```
 > **Note:** Get your free API key at [Google AI Studio](https://aistudio.google.com/).
 
-### 5. First Launch
+### 5. Adjust Launch Scripts Paths (.bat & .vbs)
+To make launching the ecosystem seamless, the repository includes several executable scripts (`start_brain.bat`, `run_jarvis.vbs`, `run_creative_leader.vbs`, etc.). However, these scripts contain hardcoded paths tailored to the original developer's machine.
+
+Before running them:
+1. Open each `.vbs` and `.bat` file in a text editor (like Notepad or VS Code).
+2. Locate the absolute folder paths inside the code.
+3. Replace them with the actual paths pointing to where you cloned the AutoBrain repository on your local machine.
+
+### 6. First Launch
 1.  **Initialize the Brain:** Run `start_brain.bat`. It will scan your documents and build the initial Knowledge Graph.
 2.  **Activate Jarvis:** Run `run_jarvis.vbs`. The Arc Reactor GUI will appear at the center of your screen when you call him.
 
