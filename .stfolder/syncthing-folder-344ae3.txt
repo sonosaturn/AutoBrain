@@ -1,5 +1,0 @@
-# This directory is a Syncthing folder marker.
-# Do not delete.
-
-folderID: i53es-bjzin
-created: 2026-05-19T01:17:36+02:00
