@@ -9,20 +9,18 @@ ENV/
 # Syncthing Temporary
 .stversions/
 
-# Database Locali (RAG / Graph)
-# Escludiamo i DB locali per evitare conflitti di lock e ridondanza. 
-# Verranno ricostruiti sul portatile tramite gli script di reindex.
+# Local Database (RAG / Graph)
 jarvis_db/
 graph.json
 
-# Audio Cache (Nomi file statici ma pesanti)
+# Audio Cache
 audio_cache/
 *.mp3
 
-# Log Locali
+# Logs
 *.log
 
-# Credenziali e Configurazione Macchina (NON SINCRONIZZARE MAI)
+# Credentials & Configs
 .env
 .claude/
 .git/
