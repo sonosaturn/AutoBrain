@@ -1,23 +1,27 @@
 import os
 import json
 import logging
-from google import genai
-from google.genai import types
-from dotenv import load_dotenv
+import sys
 
-load_dotenv()
+# Modular Import Logic
+try:
+    from core_utils import Config, models
+except ImportError:
+    # Fallback for transition phase
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from core_utils import Config, models
 
-# MANDATORY MODEL NAMES
-VOICE_MODEL = "gemini-3.1-flash-lite"
-BRAIN_MODEL = "gemini-3-flash-preview"
+# MANDATORY MODEL NAMES (From Hub)
+VOICE_MODEL = Config.VOICE_MODEL
+BRAIN_MODEL = Config.BRAIN_MODEL
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+client = models.client
 
 # ---------------------------------------------------------------------------
 # "HANDS" - DEVELOPMENT TOOLS (For Agents)
 # ---------------------------------------------------------------------------
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = Config.JARVIS_DIR
 
 def _resolve_path(file_path: str):
     """Resolves and validates paths to avoid system errors or access outside the project folder."""

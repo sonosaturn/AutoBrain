@@ -1,3 +1,13 @@
+# 🧠 Integrità Architetturale (GitNexus)
+
+**MANDATORIO:** Per ogni modifica che non sia una correzione di bug triviale, DEVI utilizzare GitNexus per preservare la struttura "Hub & Spoke" del progetto.
+
+- **Prima di modificare un simbolo:** Esegui `gitnexus_impact` per valutare il "blast radius". Se il rischio è ALTO (molte dipendenze), chiedi conferma all'utente.
+- **Per capire i flussi:** Usa `gitnexus_query` per visualizzare come i dati fluiscono tra i moduli prima di aggiungere nuove logiche.
+- **Post-Modifica:** Verifica che i nuovi collegamenti non creino accoppiamenti circolari tra i moduli (es. Jarvis non deve dipendere direttamente dalle logiche interne del Brain, ma passare attraverso le API definite).
+
+---
+
 # 🛰️ Protocollo di Delega (Dispatch Queue)
 
 **MANDATORIO AD OGNI AVVIO:** Controlla la sottocartella `_Dispatch_Queue` all'interno del tuo `CONVO_VAULT_PATH`. 

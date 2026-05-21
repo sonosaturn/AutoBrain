@@ -3,30 +3,28 @@ import docx        # python-docx for Word files
 import os
 import time
 import logging
-from dotenv import load_dotenv
-from google import genai
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+import sys
 
-# Import local modules
-from validator import validate_and_retry
-from sync_manager import auto_extract_cli_history
-from graph_manager import build_knowledge_graph
-from usage_logger import log_usage
+# Modular Import Logic
+try:
+    from core_utils import Config, models
+except ImportError:
+    # Fallback for transition phase
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from core_utils import Config, models
 
-load_dotenv()
-VAULT_PATH = os.getenv("VAULT_PATH")
+VAULT_PATH = Config.VAULT_PATH
 
-# Initialize Google GenAI Client (New SDK)
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# Initialize Google GenAI Client (Shared)
+client = models.client
 
 AI_FOLDER_NAME = "Z_Second_Brain"
 AI_FOLDER_PATH = os.path.join(VAULT_PATH, AI_FOLDER_NAME)
 os.makedirs(AI_FOLDER_PATH, exist_ok=True)
 
 # MODEL CONFIGURATION
-MODEL_QUALITY = "gemini-3.1-flash-lite"
-MODEL_FAST    = "gemini-3-flash-preview"
+MODEL_QUALITY = Config.VOICE_MODEL
+MODEL_FAST    = Config.BRAIN_MODEL
 DESCRIBE_IMAGES = True
 FAST_MODEL_THRESHOLD = 8_000
 
