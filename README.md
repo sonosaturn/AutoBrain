@@ -106,6 +106,20 @@ To swap models, update the global variables in `jarvis/jarvis_engine.py` and `ja
 - **Self-Healing (Repair):** Defaults to every **2 hours**. Change this in `jarvis/creative_leader.py`.
 - **Innovation (Creative):** Defaults to every **24 hours**. Change this in `jarvis/creative_leader.py`.
 
+## 📊 Observability & Monitoring
+
+AutoBrain includes a built-in observability dashboard powered by **CodeBurn**.
+
+### Prerequisite: CodeBurn
+To use the dashboard, you need to have Node.js installed. Install CodeBurn globally via npm:
+```bash
+npm install -g codeburn
+```
+You can then launch the dashboard using `start_dashboard.bat`.
+
+### Usage Stats
+The `usage_logger.py` module (located in `autobrain_core/`) tracks token usage and estimated costs for all AI interactions. Statistics are displayed in the console when launching the dashboard.
+
 ## Security and Portability
 The `.gitignore` is pre-configured to exclude heavy databases (ChromaDB) and sensitive API keys (`.env`). The project is ready for multi-machine synchronization (e.g., via Syncthing or Git) without conflicts.
 

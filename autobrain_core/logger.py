@@ -1,13 +1,17 @@
 import os
 import re
+import sys
 from datetime import datetime
-from dotenv import load_dotenv
-import google.generativeai as genai
 
-load_dotenv()
+# Modular Import Logic
+try:
+    from core_utils import Config, models
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from core_utils import Config, models
 
-MODEL_NAME = "gemini-3-flash-preview"
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+MODEL_NAME = Config.BRAIN_MODEL
+client = models.client
 
 def summarize_ai_response(text):
     """Sintetizza la risposta dell'IA per il vault: toglie il codice e riassume il resto."""
@@ -28,8 +32,10 @@ def summarize_ai_response(text):
     {text}
     """
     try:
-        summary_model = genai.GenerativeModel(MODEL_NAME)
-        res = summary_model.generate_content(summary_prompt)
+        res = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=summary_prompt
+        )
         return res.text.strip() + files_str
     except:
         clean_text = re.sub(r'```.*?```', '[Codice rimosso]', text, flags=re.DOTALL)
@@ -37,7 +43,7 @@ def summarize_ai_response(text):
 
 class ConversationLogger:
     def __init__(self, identity="Gemini"):
-        self.vault_path = os.getenv("CONVO_VAULT_PATH")
+        self.vault_path = Config.CONVO_VAULT_PATH
         if not self.vault_path:
             raise ValueError("CONVO_VAULT_PATH non trovata nel file .env")
         

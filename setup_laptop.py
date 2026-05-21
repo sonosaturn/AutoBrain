@@ -8,14 +8,14 @@ def setup():
     # 1. Creazione venv se non esiste
     if not os.path.exists("venv"):
         print("📦 Creazione ambiente virtuale...")
-        subprocess.run([sys.executable, "-m", "venv", "venv"])
+        subprocess.run([sys.executable, "-m", "venv", "venv"], check=True)
     
     # 2. Installazione requirements
     python_exe = os.path.join("venv", "Scripts", "python.exe") if os.name == "nt" else os.path.join("venv", "bin", "python")
     
     if os.path.exists("requirements.txt"):
         print("📥 Installazione dipendenze...")
-        subprocess.run([python_exe, "-m", "pip", "install", "-r", "requirements.txt"])
+        subprocess.run([python_exe, "-m", "pip", "install", "-r", "requirements.txt"], check=True)
     else:
         print("⚠️ requirements.txt non trovato. Salto installazione.")
 

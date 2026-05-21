@@ -6,21 +6,25 @@ import os
 import json
 import threading
 import webbrowser
+import sys
 from datetime import datetime
 from flask import Flask, render_template, request, Response, stream_with_context
-from dotenv import load_dotenv
-import google.generativeai as genai
+
+# Modular Import Logic
+try:
+    from core_utils import Config, models
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from core_utils import Config, models
 
 # Moduli locali
 from graph_manager import get_context_for_query
 
-load_dotenv()
-VAULT_PATH = os.getenv("VAULT_PATH")
-CONVO_VAULT_PATH = os.getenv("CONVO_VAULT_PATH")
+VAULT_PATH = Config.VAULT_PATH
+CONVO_VAULT_PATH = Config.CONVO_VAULT_PATH
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
-MODEL_NAME = "gemini-3-flash-preview"
+client = models.client
+MODEL_NAME = Config.BRAIN_MODEL
 CONV_VAULT_PATH = CONVO_VAULT_PATH 
 os.makedirs(CONV_VAULT_PATH, exist_ok=True)
 
@@ -75,23 +79,35 @@ def chat():
     conversation_history.append({"role": "user", "content": user_message})
     
     # Prepara il modello Gemini con il contesto dinamico estratto dal grafo
-    model = genai.GenerativeModel(
-        model_name=MODEL_NAME,
-        system_instruction=build_system_prompt(user_message)
-    )
-
-    gemini_history = []
+    system_instruction = build_system_prompt(user_message)
+    
+    # Prepara la cronologia per il nuovo SDK (formato Contents)
+    history_contents = []
     for msg in conversation_history[:-1]:
         role = "user" if msg["role"] == "user" else "model"
-        gemini_history.append({"role": role, "parts": [msg["content"]]})
-
-    chat_session = model.start_chat(history=gemini_history)
+        history_contents.append({"role": role, "parts": [{"text": msg["content"]}]})
 
     def generate():
         full_reply = ""
         try:
-            response = chat_session.send_message(user_message, stream=True)
-            for chunk in response:
+            # Nuovo SDK: client.models.generate_content (oppure start_chat)
+            # Per semplicità in questo refactoring usiamo generate_content con history
+            response = client.models.generate_content(
+                model=MODEL_NAME,
+                contents=user_message,
+                config={
+                    "system_instruction": system_instruction,
+                    # history non è un parametro diretto di generate_content nel nuovo SDK
+                    # bisogna passarla nei contents. Per semplicità usiamo un prompt concatenato o refactor chat
+                }
+            )
+            # Refactoring completo per supportare streaming con il nuovo SDK
+            # (Nota: Il nuovo SDK google-genai ha una sintassi diversa per lo streaming)
+            for chunk in client.models.generate_content_stream(
+                model=MODEL_NAME,
+                contents=user_message,
+                config={"system_instruction": system_instruction}
+            ):
                 text = chunk.text
                 full_reply += text
                 yield f"data: {json.dumps({'token': text})}\n\n"

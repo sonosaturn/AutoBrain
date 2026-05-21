@@ -1,16 +1,19 @@
 import os
 import mss
 import mss.tools
+import sys
 from PIL import Image
-import google.generativeai as genai
-from dotenv import load_dotenv
 from datetime import datetime
 
-basedir = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(basedir, ".env"))
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Modular Import Logic
+try:
+    from core_utils import Config, models
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from core_utils import Config, models
 
-MODEL_NAME = "gemini-3-flash-preview"
+MODEL_NAME = Config.BRAIN_MODEL
+client = models.client
 
 def capture_all_screens():
     """Cattura uno screenshot per ogni monitor connesso."""
@@ -42,9 +45,7 @@ async def analyze_screen_context(prompt_text):
     
     loaded_images = []
     try:
-        model = genai.GenerativeModel(model_name=MODEL_NAME)
-        
-        # Prepariamo il contenuto multimodale
+        # Prepariamo il contenuto multimodale per il nuovo SDK
         instruction = f"""Sei gli occhi di Jarvis. Lorenzo ha una configurazione multi-monitor ({len(image_paths)} schermi).
 Ti sto inviando le immagini dei singoli monitor. 
 
@@ -55,14 +56,17 @@ Indica chiaramente su quale monitor (1, 2, ecc.) vedi ciò che descrivi, se pert
 """
         contents = [instruction]
         
-        # Carichiamo le immagini in memoria
+        # Carichiamo le immagini e le formattiamo per il nuovo SDK
         for path in image_paths:
-            loaded_images.append(Image.open(path))
+            with open(path, "rb") as f:
+                img_data = f.read()
+                contents.append({"mime_type": "image/png", "data": img_data})
         
-        contents.extend(loaded_images)
-        
-        # Chiamata asincrona a Gemini
-        response = await model.generate_content_async(contents)
+        # Chiamata al nuovo SDK
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=contents
+        )
         
         return response.text
         
