@@ -1,6 +1,6 @@
 # 🛰️ Protocollo di Delega (Dispatch Queue)
 
-**MANDATORIO AD OGNI AVVIO:** Controlla la cartella `C:/Users/Lorenzo/Documents/convo vault/Jarvis/_Dispatch_Queue`. 
+**MANDATORIO AD OGNI AVVIO:** Controlla la sottocartella `_Dispatch_Queue` all'interno del tuo `CONVO_VAULT_PATH`. 
 - Se trovi file con `stato: pendente`, prendili in carico immediatamente.
 - Esegui il bug fixing o lo sviluppo richiesto.
 - Una volta finito, aggiorna il file Markdown cambiando lo stato in `completato` e aggiungendo il riassunto della soluzione.

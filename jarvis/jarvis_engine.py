@@ -30,14 +30,61 @@ def _resolve_path(file_path: str):
         raise PermissionError(f"Access denied: Cannot operate outside of {BASE_DIR}")
     return abs_path
 
+import py_compile
+import shutil
+import subprocess
+
+def gitnexus_query(query_text: str):
+    """Queries the project architecture using GitNexus."""
+    try:
+        # We use --skip-git since the project structure might not be a standard git repo in all environments
+        result = subprocess.run(["gitnexus", "query", query_text, "--skip-git"], capture_output=True, text=True, check=True)
+        return result.stdout
+    except Exception as e:
+        return f"❌ GitNexus Query Error: {e}"
+
+def gitnexus_impact(symbol_name: str):
+    """Analyzes the impact (blast radius) of modifying a specific symbol."""
+    try:
+        result = subprocess.run(["gitnexus", "impact", "--target", symbol_name, "--direction", "upstream", "--skip-git"], capture_output=True, text=True, check=True)
+        return result.stdout
+    except Exception as e:
+        return f"❌ GitNexus Impact Error: {e}"
+
 def scrivi_codice(file_path: str, contenuto: str):
-    """Allows the agent to write or overwrite a file in the project."""
+    """Allows the agent to write or overwrite a file in the project with safety checks."""
     try:
         abs_path = _resolve_path(file_path)
         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        with open(abs_path, "w", encoding="utf-8") as f:
-            f.write(contenuto)
-        return f"✅ File {file_path} written successfully."
+        
+        # Security/Validation for Python files
+        if abs_path.endswith(".py"):
+            temp_path = abs_path + ".tmp"
+            with open(temp_path, "w", encoding="utf-8") as f:
+                f.write(contenuto)
+            
+            try:
+                # Syntax check
+                py_compile.compile(temp_path, doraise=True)
+                # If valid, replace original
+                if os.path.exists(abs_path):
+                    backup_path = abs_path + ".bak"
+                    shutil.copy2(abs_path, backup_path)
+                
+                shutil.move(temp_path, abs_path)
+                return f"✅ File {file_path} validated and written successfully."
+            except py_compile.PyCompileError as e:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                return f"❌ Syntax Error in generated code: {e.msg}. File not updated."
+            except Exception as e:
+                return f"❌ Validation error: {e}"
+        else:
+            # Direct write for other files
+            with open(abs_path, "w", encoding="utf-8") as f:
+                f.write(contenuto)
+            return f"✅ File {file_path} written successfully."
+            
     except Exception as e:
         return f"❌ File writing error: {e}"
 
@@ -53,7 +100,7 @@ def leggi_codice(file_path: str):
         return f"❌ File reading error: {e}"
 
 # Available tools for the model
-tools = [scrivi_codice, leggi_codice]
+tools = [scrivi_codice, leggi_codice, gitnexus_query, gitnexus_impact]
 
 # ---------------------------------------------------------------------------
 # AGENTIC CORE (NATIVE)
@@ -105,8 +152,9 @@ def agente_sviluppatore(obiettivo: str):
     
     system_instruction = (
         "You are the Jarvis Senior Developer. Your goal is to analyze and write Python code. "
-        "Use the tools 'leggi_codice' (read code) to understand context and 'scrivi_codice' (write code) to implement. "
-        "Proceed step-by-step. Be concise and professional."
+        "MANDATORY: Before modifying any function or class, you MUST run 'gitnexus_impact' to understand the blast radius. "
+        "Use 'gitnexus_query' to explore the architecture and 'leggi_codice' to read files. "
+        "Use 'scrivi_codice' to implement fixes. Proceed step-by-step. Be concise and professional."
     )
 
     for current_model in models_to_try:
@@ -137,6 +185,28 @@ def agente_sviluppatore(obiettivo: str):
                             "file_path": {"type": "STRING"}
                         },
                         "required": ["file_path"]
+                    }
+                ),
+                types.FunctionDeclaration(
+                    name="gitnexus_query",
+                    description="Queries the project architecture.",
+                    parameters={
+                        "type": "OBJECT",
+                        "properties": {
+                            "query_text": {"type": "STRING"}
+                        },
+                        "required": ["query_text"]
+                    }
+                ),
+                types.FunctionDeclaration(
+                    name="gitnexus_impact",
+                    description="Analyzes the impact of modifying a symbol.",
+                    parameters={
+                        "type": "OBJECT",
+                        "properties": {
+                            "symbol_name": {"type": "STRING"}
+                        },
+                        "required": ["symbol_name"]
                     }
                 )
             ])]

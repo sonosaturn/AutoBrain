@@ -1,7 +1,9 @@
 import os
 import re
 
-VAULT_PATH = os.getenv("VAULT_PATH", r"C:\Users\Lorenzo\Documents\uni vault")
+VAULT_PATH = os.getenv("VAULT_PATH")
+if not VAULT_PATH:
+    raise EnvironmentError("❌ VAULT_PATH non configurata nel file .env")
 
 def remove_isolated_wikilinks(vault_path):
     print("🕸️ Avvio rimozione wikilink isolati dal testo Markdown...")

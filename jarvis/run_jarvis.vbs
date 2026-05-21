@@ -1,3 +1,4 @@
-Set WinScriptHost = CreateObject("WScript.Shell")
-WinScriptHost.Run Chr(34) & "C:\Users\Lorenzo\Desktop\project\jarvis\venv\Scripts\pythonw.exe" & Chr(34) & " " & Chr(34) & "C:\Users\Lorenzo\Desktop\project\jarvis\main.py" & Chr(34), 0
-Set WinScriptHost = Nothing
+Set WshShell = CreateObject("WScript.Shell")
+strPath = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptPosition)
+WshShell.Run chr(34) & strPath & "\venv\Scripts\pythonw.exe" & chr(34) & " " & chr(34) & strPath & "\main.py" & chr(34), 0
+Set WshShell = Nothing

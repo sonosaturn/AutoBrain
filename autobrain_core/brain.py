@@ -197,17 +197,12 @@ class VaultHandler(FileSystemEventHandler):
             process_file(event.src_path)
 
 def maintenance_task():
-    """Automatically updates requirements.txt and checks project status."""
+    """Checks project status and environment consistency."""
     try:
-        req_file = os.path.join(os.path.dirname(__file__), "requirements.txt")
-        # Use venv python for freeze
-        python_exe = os.path.join(os.path.dirname(__file__), "venv", "Scripts", "python.exe")
-        if os.path.exists(python_exe):
-            import subprocess
-            res = subprocess.check_output([python_exe, "-m", "pip", "freeze"], text=True)
-            with open(req_file, "w", encoding="utf-8") as f:
-                f.write(res)
-            logging.info("📝 requirements.txt updated automatically.")
+        # We no longer perform automatic 'pip freeze' to avoid polluting the requirements.txt
+        # with every package installed in the local environment.
+        # Dependency management should be intentional.
+        logging.info("📝 Maintenance check completed (Auto-freeze disabled for portability).")
     except Exception as e:
         logging.error(f"⚠️ Error during maintenance: {e}")
 

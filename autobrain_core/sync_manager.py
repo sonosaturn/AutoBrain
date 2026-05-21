@@ -15,10 +15,12 @@ load_dotenv()
 CONVO_VAULT_PATH = os.getenv("CONVO_VAULT_PATH")
 
 # Tentativo di trovare il percorso corretto dei log della CLI
+user_profile = os.environ.get("USERPROFILE", "")
+user_name = os.environ.get("USERNAME", "default")
+
 possible_paths = [
-    os.path.join(os.environ.get("USERPROFILE", ""), ".gemini", "tmp", "desktop", "chats"),
-    os.path.join(os.environ.get("USERPROFILE", ""), ".gemini", "tmp", "Lorenzo", "chats"),
-    r"C:\Users\Lorenzo\\.gemini\tmp\Lorenzo\chats"
+    os.path.join(user_profile, ".gemini", "tmp", user_name, "chats"),
+    os.path.join(user_profile, ".gemini", "tmp", "desktop", "chats"),
 ]
 
 CLI_CHATS_PATH = None
@@ -28,7 +30,7 @@ for p in possible_paths:
         break
 
 if not CLI_CHATS_PATH:
-    CLI_CHATS_PATH = possible_paths[0] # Fallback
+    CLI_CHATS_PATH = os.path.join(user_profile, ".gemini", "tmp", user_name, "chats") # Fallback
 
 def parse_cli_content(content):
     if isinstance(content, list):
