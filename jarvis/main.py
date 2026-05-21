@@ -4,20 +4,18 @@ import pyaudio
 import vosk
 import speech_recognition as sr
 import asyncio
-from datetime import datetime
-from dotenv import load_dotenv
-from google import genai
-from google.genai import types
-
 import threading
 import sys
+import time
+from datetime import datetime
 
-basedir = os.path.dirname(os.path.abspath(__file__))
-# Add root and core to path to find modules
-root_dir = os.path.dirname(basedir)
-core_dir = os.path.join(root_dir, "autobrain_core")
-sys.path.append(root_dir)
-sys.path.append(core_dir)
+# Modular Import Logic
+try:
+    from core_utils import Config, models
+except ImportError:
+    # Fallback for transition phase
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from core_utils import Config, models
 
 from intent_parser import parse_intent
 from executor import execute_command
@@ -29,25 +27,9 @@ from audio_feedback import play_ping
 from logger import ConversationLogger
 from vision_module import analyze_screen_context
 from jarvis_gui import JarvisGUI
-load_dotenv(os.path.join(basedir, ".env"))
 
-# Initialization of GUI in a dedicated thread
-gui = None
-def run_gui():
-    global gui
-    root = tk.Tk()
-    gui = JarvisGUI(root)
-    root.mainloop()
-
-gui_thread = threading.Thread(target=run_gui, daemon=True)
-gui_thread.start()
-
-# Wait for GUI to initialize
-import time
-time.sleep(1)
-
-# New SDK client
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+# Shared Client
+client = models.client
 
 # Logger
 logger = ConversationLogger("Jarvis")
@@ -57,7 +39,7 @@ WAKE_WORDS = ["jarvis", "wake up", "computer"]
 SLEEP_WORDS = ["sleep", "turn off", "rest", "go to bed", "goodbye"]
 
 # Model for "intelligent" responses
-BRAIN_MODEL = "gemini-3-flash-preview"
+BRAIN_MODEL = Config.BRAIN_MODEL
 
 async def answer_with_brain(query_text, mode="summary"):
     """
