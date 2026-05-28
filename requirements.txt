@@ -19,3 +19,7 @@ pyautogui>=0.9.54
 pyperclip>=1.8.2
 pywin32>=306
 winshell>=0.6
+fastapi>=0.100.0
+uvicorn>=0.22.0
+pygetwindow>=0.0.9
+websockets>=11.0.0

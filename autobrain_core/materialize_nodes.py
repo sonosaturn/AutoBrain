@@ -9,29 +9,29 @@ load_dotenv()
 VAULTS = {
     "UNI_VAULT": {
         "path": os.getenv("VAULT_PATH"),
-        "concept_folder": "_Concetti"
+        "concept_folder": "_Concepts"
     },
     "CONVO_VAULT": {
         "path": os.getenv("CONVO_VAULT_PATH"),
-        "concept_folder": "_Concetti"
+        "concept_folder": "_Concepts"
     }
 }
 
-def get_wikilink_frequencies(vault_path):
+def get_wikilink_frequencies(vault_path, concept_folder):
     """Conta quante volte ogni [[wikilink]] viene citato in file diversi."""
     link_counts = {} # { "NomeLink": set(["file1.md", "file2.md"]) }
     existing_files = set()
     
-    # 1. Mappiamo tutti i file esistenti (escludendo la cartella _Concetti)
+    # 1. Mappiamo tutti i file esistenti (escludendo la cartella dei concetti)
     for root, _, files in os.walk(vault_path):
-        if "_Concetti" in root: continue
+        if concept_folder in root: continue
         for f in files:
             if f.endswith(".md"):
                 existing_files.add(f[:-3].lower())
                 
     # 2. Scansioniamo i file per contare le citazioni
     for root, dirs, files in os.walk(vault_path):
-        if ".obsidian" in root or "_Concetti" in root:
+        if ".obsidian" in root or concept_folder in root:
             continue
             
         for f in files:
@@ -42,10 +42,15 @@ def get_wikilink_frequencies(vault_path):
                         matches = re.findall(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", content)
                         for m in matches:
                             link = m.strip()
-                            if link.lower() not in existing_files:
-                                if link not in link_counts:
-                                    link_counts[link] = set()
-                                link_counts[link].add(f)
+                            # Normalizziamo il link rimuovendo estensioni comuni
+                            link_clean = link
+                            if link_clean.lower().endswith(".md"): link_clean = link_clean[:-3]
+                            if link_clean.lower().endswith(".pdf"): link_clean = link_clean[:-4]
+                            
+                            if link_clean.lower() not in existing_files:
+                                if link_clean not in link_counts:
+                                    link_counts[link_clean] = set()
+                                link_counts[link_clean].add(f)
                 except: pass
                     
     return link_counts
@@ -61,7 +66,7 @@ def materialize(vault_name, config):
     print(f"🧠 Ottimizzazione nodi per: {vault_name}")
     os.makedirs(concept_dir, exist_ok=True)
     
-    link_frequencies = get_wikilink_frequencies(path)
+    link_frequencies = get_wikilink_frequencies(path, config["concept_folder"])
     
     # Filtriamo: solo i link citati in almeno 2 file diversi
     links_to_keep = {link for link, sources in link_frequencies.items() if len(sources) >= 2}
@@ -80,21 +85,40 @@ def materialize(vault_name, config):
                     cleaned_count += 1
                 except: pass
     
-    # 2. Creazione: Materializziamo solo i ponti
-    created_count = 0
+    # 2. Creazione/Aggiornamento: Materializziamo solo i ponti
+    processed_count = 0
     for link in links_to_keep:
         safe_name = re.sub(r'[\\/*?:"<>|]', "", link)
         file_path = os.path.join(concept_dir, f"{safe_name}.md")
         
-        if not os.path.exists(file_path):
-            try:
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(f"---\ntipo: concetto\nautomatico: true\n---\n\n# {link}\n\nQuesto nodo è un 'Ponte' in quanto citato in più documenti.")
-                created_count += 1
-            except: pass
+        # Recuperiamo le fonti (i padri)
+        sources = sorted(list(link_frequencies[link]))
+        backlinks_md = "\n".join([f"- [[{s}]]" for s in sources])
+
+        content = f"""---
+tipo: concetto
+automatico: true
+fonti_count: {len(sources)}
+---
+
+# {link}
+
+Questo nodo è un **Ponte** che collega diversi documenti della base di conoscenza.
+
+## 🔗 Menzionato in:
+{backlinks_md}
+"""
+        
+        try:
+            # Scriviamo sempre (sovrascrivendo) per aggiornare i backlinks
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            processed_count += 1
+        except Exception as e:
+            print(f"  ❌ Errore nella scrittura di {safe_name}: {e}")
                 
     print(f"  🧹 Rimosse {cleaned_count} vecchie definizioni isolate.")
-    print(f"  ✅ Creati {created_count} nuovi nodi ponte.")
+    print(f"  ✅ Processati {processed_count} nodi ponte con relativi backlinks.")
 
 def main():
     for name, config in VAULTS.items():

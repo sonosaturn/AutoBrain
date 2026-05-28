@@ -20,66 +20,47 @@ except ImportError:
 from intent_parser import parse_intent
 from executor import execute_command
 from tts import speak
-from jarvis_engine import agente_sviluppatore # Import the agent engine
+from jarvis_engine import agente_sviluppatore
 from graph_manager import get_context_for_query
 from usage_logger import log_usage
 from audio_feedback import play_ping
 from logger import ConversationLogger
 from vision_module import analyze_screen_context
-from jarvis_gui import JarvisGUI
+from api import app, jarvis_state
+import uvicorn
+from window_manager import focus_jarvis_window
 
 # Shared Client
 client = models.client
-
 # Logger
 logger = ConversationLogger("Jarvis")
-
-# Wake Words Configuration
+# Models
+BRAIN_MODEL = Config.BRAIN_MODEL
+# Config
 WAKE_WORDS = ["jarvis", "wake up", "computer"]
 SLEEP_WORDS = ["sleep", "turn off", "rest", "go to bed", "goodbye"]
 
-# Model for "intelligent" responses
-BRAIN_MODEL = Config.BRAIN_MODEL
+async def run_server():
+    config = uvicorn.Config(app=app, host="127.0.0.1", port=8000, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
 
 async def answer_with_brain(query_text, mode="summary"):
-    """
-    Queries the Second Brain.
-    """
     context = get_context_for_query(query_text)
-    
     if mode == "summary":
-        system_instruction = f"""You are Jarvis. Respond based on these notes:
-        {context}
-        
-        RULES:
-        1. Make a SUPER DENSE summary (max 20-30 words).
-        2. Briefly list key points.
-        3. Ask the user which aspect they want to explore further and if they prefer VOICE or TEXT.
-        4. Be cordial and professional (Iron Man style).
-        """
+        system_instruction = f"You are Jarvis. Respond based on these notes:\n{context}\n\nRULES:\n1. Make a SUPER DENSE summary (max 20-30 words).\n2. Briefly list key points.\n3. Ask the user which aspect they want to explore further and if they prefer VOICE or TEXT.\n4. Be cordial and professional (Iron Man style)."
     else:
-        system_instruction = f"""You are Jarvis. Respond based on these notes:
-        {context}
-        
-        RULES:
-        1. Provide a detailed but balanced explanation.
-        2. Do not be wordy, maintain the user's attention.
-        3. If it's a text response, use clean Markdown.
-        """
+        system_instruction = f"You are Jarvis. Respond based on these notes:\n{context}\n\nRULES:\n1. Provide a detailed but balanced explanation.\n2. Do not be wordy, maintain the user's attention.\n3. If it's a text response, use clean Markdown."
 
     try:
+        from google.genai import types
         response = client.models.generate_content(
             model=BRAIN_MODEL,
             contents=query_text,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction
-            )
+            config=types.GenerateContentConfig(system_instruction=system_instruction)
         )
-        
-        # Token logging for observability
         usage = response.usage_metadata
         log_usage(BRAIN_MODEL, usage.prompt_token_count, usage.candidates_token_count, task_type="jarvis_query")
-        
         return response.text
     except Exception as e:
         print(f"⚠️ Brain-Jarvis Error: {e}")
@@ -88,33 +69,65 @@ async def answer_with_brain(query_text, mode="summary"):
 def load_vosk_model():
     model_path = os.path.join(os.path.dirname(__file__), "model")
     if not os.path.exists(model_path) or not os.listdir(model_path):
-        print("📥 Vosk model not found. Automatic download...")
-        import urllib.request
-        import zipfile
-        import shutil
-        url = "https://alphacephei.com/vosk/models/vosk-model-small-it-0.22.zip"
-        zip_path = os.path.join(os.path.dirname(__file__), "vosk_model.zip")
-        try:
-            urllib.request.urlretrieve(url, zip_path)
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(os.path.dirname(__file__))
-            extracted_dir = os.path.join(os.path.dirname(__file__), "vosk-model-small-it-0.22")
-            if os.path.exists(extracted_dir):
-                if os.path.exists(model_path):
-                    shutil.rmtree(model_path)
-                os.rename(extracted_dir, model_path)
-            if os.path.exists(zip_path):
-                os.remove(zip_path)
-            print("✅ Vosk model ready.")
-        except Exception as e:
-            print(f"❌ Model download error: {e}")
-            return None
+        return None
     return vosk.Model(model_path)
+
+async def process_user_request(user_text, is_voice=True):
+    """Common logic for processing commands from voice or text."""
+    await jarvis_state.set_state("THINKING")
+    print(f"🤖 Processing: {user_text}")
+    
+    comando_json = parse_intent(user_text)
+    azione = comando_json.get("azione")
+    parametro = comando_json.get("parametro", "")
+    
+    risposta_finale = ""
+    if azione == "messaggio":
+        deep_keywords = ["elaborate", "tell me more", "details", "explain better", "by voice"]
+        if any(k in user_text.lower() for k in deep_keywords):
+            risposta_finale = await answer_with_brain(parametro, mode="detailed")
+        else:
+            risposta_finale = await answer_with_brain(parametro, mode="summary")
+    elif azione == "mostra_testo":
+        testo_dettagliato = await answer_with_brain(parametro, mode="detailed")
+        comando_json["parametro"] = testo_dettagliato
+        risposta_finale = execute_command(comando_json)
+    elif azione == "analizza_schermo":
+        risposta_finale = await analyze_screen_context(user_text)
+    elif azione == "obiettivo_agente":
+        if is_voice: await speak("Right away, Sir. Activating development protocols.")
+        risposta_finale = agente_sviluppatore(parametro)
+    else:
+        risposta_finale = execute_command(comando_json)
+    
+    if risposta_finale.strip().startswith("SILENT|"):
+        risposta_log = risposta_finale.replace("SILENT|", "").strip()
+        logger.log_interazione_completa(user_text, risposta_log, summarize=True)
+        await jarvis_state.set_state("IDLE")
+        return risposta_log
+    else:
+        logger.log_interazione_completa(user_text, risposta_finale, summarize=True)
+        if is_voice:
+            await jarvis_state.set_state("SPEAKING")
+            await speak(risposta_finale)
+        await jarvis_state.set_state("IDLE")
+        return risposta_finale
+
+async def handle_text_commands():
+    """Monitor the command queue for text input from the Web UI."""
+    while True:
+        command = await jarvis_state.command_queue.get()
+        if command:
+            # We broadcast the user's text to the UI as well (to show in chat)
+            await jarvis_state.broadcast({"type": "USER_MESSAGE", "data": command})
+            response = await process_user_request(command, is_voice=False)
+            await jarvis_state.broadcast({"type": "JARVIS_RESPONSE", "data": response})
+        jarvis_state.command_queue.task_done()
 
 async def listen_and_process():
     model = load_vosk_model()
     if not model:
-        print("❌ Could not load voice model. Exiting.")
+        print("❌ Could not load voice model.")
         return
 
     rec = vosk.KaldiRecognizer(model, 16000)
@@ -125,7 +138,10 @@ async def listen_and_process():
     print(f"🚀 Jarvis (Optimized Graph-RAG) listening...")
 
     while True:
-        data = stream.read(4000, exception_on_overflow=False)
+        # Use run_in_executor to avoid blocking the event loop with stream.read
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(None, stream.read, 4000, False)
+        
         if len(data) == 0: break
         if rec.AcceptWaveform(data):
             result = json.loads(rec.Result())
@@ -133,97 +149,59 @@ async def listen_and_process():
             
             if any(word in text for word in WAKE_WORDS):
                 print(f"✨ Wake word detected: {text}")
+                focus_jarvis_window()
+                await jarvis_state.notify_wake_word(text)
                 
                 active_session = True
                 while active_session:
                     stream.stop_stream()
-                    
-                    # Show GUI in listening state
-                    if gui:
-                        gui.set_state("LISTENING")
-                        gui.show()
+                    await jarvis_state.set_state("LISTENING")
                     
                     recognizer = sr.Recognizer()
                     recognizer.pause_threshold = 2.0 
                     with sr.Microphone() as source:
                         print("🎤 Active listening...")
                         try:
-                            audio = recognizer.listen(source, timeout=10, phrase_time_limit=15)
-                            user_text = recognizer.recognize_google(audio, language="it-IT")
+                            # recognizer.listen is blocking, run in executor
+                            audio = await loop.run_in_executor(None, lambda: recognizer.listen(source, timeout=10, phrase_time_limit=15))
+                            user_text = await loop.run_in_executor(None, recognizer.recognize_google, audio, "it-IT")
                             print(f"🗣️ You said: {user_text}")
                             
-                            # Sleep Words Control
                             if any(word in user_text.lower() for word in SLEEP_WORDS):
-                                print("😴 Sleep command received.")
+                                await jarvis_state.set_state("SPEAKING")
                                 await speak("Certainly, Sir. I am going to rest. Call me if you need anything else.")
                                 active_session = False
-                                if gui: gui.hide()
+                                await jarvis_state.set_state("IDLE")
                                 break
 
-                            # Switch to THINKING state during processing
-                            if gui: gui.set_state("THINKING")
-                            
-                            comando_json = parse_intent(user_text)
-                            azione = comando_json.get("azione")
-                            parametro = comando_json.get("parametro", "")
-                            
-                            risposta_finale = ""
-
-                            if azione == "messaggio":
-                                deep_keywords = ["elaborate", "tell me more", "details", "explain better", "by voice"]
-                                if any(k in user_text.lower() for k in deep_keywords):
-                                    risposta_finale = await answer_with_brain(parametro, mode="detailed")
-                                else:
-                                    risposta_finale = await answer_with_brain(parametro, mode="summary")
-                                    
-                            elif azione == "mostra_testo":
-                                testo_dettagliato = await answer_with_brain(parametro, mode="detailed")
-                                comando_json["parametro"] = testo_dettagliato
-                                risposta_finale = execute_command(comando_json)
-                            
-                            elif azione == "analizza_schermo":
-                                print("👁️ Vision activation...")
-                                risposta_finale = await analyze_screen_context(user_text)
-                            
-                            elif azione == "obiettivo_agente":
-                                print(f"👨‍💻 Developer Agent activation for: {parametro}")
-                                await speak("Right away, Sir. Activating development protocols and proceeding with the task.")
-                                risposta_finale = agente_sviluppatore(parametro)
-                            
-                            else:
-                                risposta_finale = execute_command(comando_json)
-                            
-                            # Log and Response
-                            if risposta_finale.strip().startswith("SILENT|"):
-                                risposta_log = risposta_finale.replace("SILENT|", "").strip()
-                                logger.log_interazione_completa(user_text, risposta_log, summarize=True)
-                                # In continuous mode, return to listening after silent command
-                                if gui: gui.set_state("LISTENING")
-                            else:
-                                logger.log_interazione_completa(user_text, risposta_finale, summarize=True)
-                                if gui: gui.set_state("SPEAKING")
-                                await speak(risposta_finale)
-                                # After speaking, return automatically to listening
-                                if gui: gui.set_state("LISTENING")
+                            response = await process_user_request(user_text, is_voice=True)
+                            await jarvis_state.broadcast({"type": "JARVIS_RESPONSE", "data": response})
+                            await jarvis_state.set_state("LISTENING")
                                 
                         except sr.WaitTimeoutError:
-                            print("⏳ Active listening timeout. Returning to standby.")
                             active_session = False
-                            if gui: gui.hide()
+                            await jarvis_state.set_state("IDLE")
                         except Exception as e:
-                            print(f"⚠️ Active session error: {e}")
+                            print(f"⚠️ Error: {e}")
                             active_session = False
-                            if gui: gui.hide()
+                            await jarvis_state.set_state("IDLE")
                     
                     if active_session:
-                        # Small delay to avoid frantic loops
                         await asyncio.sleep(0.5)
                 
                 stream.start_stream()
                 rec.Reset()
 
 if __name__ == "__main__":
+    async def main():
+        # Start server, command handler and listener concurrently
+        await asyncio.gather(
+            run_server(),
+            handle_text_commands(),
+            listen_and_process()
+        )
+
     try:
-        asyncio.run(listen_and_process())
+        asyncio.run(main())
     except KeyboardInterrupt:
         print("\n👋 Jarvis offline.")
