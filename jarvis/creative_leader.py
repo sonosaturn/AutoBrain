@@ -61,6 +61,29 @@ class CreativeLeaderAgent:
         logger.info(f"🚨 {len(pending_errors)} errors detected. Starting AUTO-REPAIR cycle...")
         self._run_task(task_mode="REPAIR", error_file=pending_errors[0])
 
+    def analyze_project(self):
+        """Usa GitNexus per ottenere un riassunto dell'architettura del progetto."""
+        logger.info("🔍 Analisi del progetto tramite GitNexus...")
+        try:
+            # Importazione tardiva per evitare circolarità
+            from jarvis_engine import gitnexus_query
+            context = gitnexus_query("Fornisci un riassunto dell'architettura Hub & Spoke e dei flussi principali.")
+            return context
+        except Exception as e:
+            logger.error(f"⚠️ Errore durante l'analisi GitNexus: {e}")
+            return "Contesto non disponibile."
+
+    def _salva_report(self, timestamp, contenuto, stato, cartella):
+        """Salva il report dell'operazione su file."""
+        nome_file = f"Report_{stato}_{timestamp}.md"
+        percorso = os.path.join(cartella, nome_file)
+        try:
+            with open(percorso, "w", encoding="utf-8") as f:
+                f.write(contenuto)
+            logger.info(f"📁 Report salvato: {nome_file}")
+        except Exception as e:
+            logger.error(f"❌ Errore salvataggio report: {e}")
+
     def _run_task(self, task_mode, error_file=None):
         context_error = ""
         if error_file and self.convo_vault:

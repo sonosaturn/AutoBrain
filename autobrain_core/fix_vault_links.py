@@ -30,9 +30,10 @@ def fix_file(file_path, identity):
         # Se è già dentro [[ ]], non facciamo nulla (regex negativa non banale qui, facciamo check manuale)
         return f"[[{file_ref}]]"
 
-    # Regex per trovare file: parola.estensione che non sia già preceduta da [[
-    # Usiamo un approccio più sicuro: cerchiamo @file.py o nomi file espliciti
-    new_content = re.sub(r'(?<!\[\[)(@?[\w\-\.\/\\]+\.(?:py|md|txt|pdf|docx|json|js|ts|cpp|h))(?<!\]\])', replace_file, content)
+    # Regex migliorata: cattura solo i file che iniziano esplicitamente con @ (aggiunto dalla CLI)
+    # oppure cattura file locali senza slash (es. script.py). Include i due punti per i dischi (es. C:\).
+    # Esclude esplicitamente url http.
+    new_content = re.sub(r'(?<!\[\[)(@(?:[A-Za-z]:)?[\w\-\.\/\\:]+\.[a-zA-Z0-9]+)(?<!\]\])', replace_file, content)
     
     if new_content != content:
         content = new_content

@@ -1,10 +1,10 @@
 """
-validator.py — Validazione strutturale e retry intelligente per il Secondo Cervello.
+validator.py — Structural validation and intelligent retry system for the Second Brain.
 
-Architettura a tre livelli:
-  1. Validazione deterministica (zero costo API)
-  2. Retry con prompt di correzione chirurgica
-  3. Quarantena con log diagnostico per i casi irrecuperabili
+Three-level architecture:
+  1. Deterministic validation (zero API cost)
+  2. Retry with surgical correction prompt
+  3. Quarantine with diagnostic log for unrecoverable cases
 """
 
 import re
@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 
 
 # ---------------------------------------------------------------------------
-# STRUTTURA DI UN RISULTATO DI VALIDAZIONE
+# VALIDATION RESULT STRUCTURE
 # ---------------------------------------------------------------------------
 
 @dataclass
@@ -28,116 +28,116 @@ class ValidationResult:
     def __str__(self):
         parts = []
         if self.errors:
-            parts.append("ERRORI: " + "; ".join(self.errors))
+            parts.append("ERRORS: " + "; ".join(self.errors))
         if self.warnings:
-            parts.append("AVVISI: " + "; ".join(self.warnings))
+            parts.append("WARNINGS: " + "; ".join(self.warnings))
         return " | ".join(parts) if parts else "OK"
 
 
 # ---------------------------------------------------------------------------
-# LIVELLO 1 — VALIDATORE STRUTTURALE (deterministico, senza API)
+# LEVEL 1 — STRUCTURAL VALIDATOR (deterministic, no API)
 # ---------------------------------------------------------------------------
 
-# Queste regole mappano esattamente le REGOLE DI ELABORAZIONE del tuo SYSTEM_PROMPT.
-# Ogni regola è una funzione che riceve il testo e restituisce un messaggio di errore
-# (stringa) se la regola è violata, oppure None se è rispettata.
+# These rules map exactly to the processing rules in your SYSTEM_PROMPT.
+# Each rule is a function that receives the text and returns an error message
+# (string) if the rule is violated, or None if it is respected.
 
 def _rule_has_h1_title(text: str) -> str | None:
-    """Il documento deve iniziare con un titolo H1 (#)."""
+    """The document must start with an H1 title (#)."""
     stripped = text.strip()
     if not stripped.startswith("#"):
-        # Cerca se esiste almeno un H1 nel testo (potrebbe esserci CoT prima)
+        # Check if at least one H1 exists in the text (there might be residue CoT before)
         if re.search(r"^#\s+\S", text, re.MULTILINE):
-            return "Testo prima del primo titolo H1 (CoT residuo)"
-        return "Nessun titolo H1 trovato"
+            return "Text before the first H1 title (residue CoT)"
+        return "No H1 title found"
     return None
 
 
 def _rule_no_cot_markers(text: str) -> str | None:
     """
-    Cerca pattern tipici di Chain-of-Thought che non dovrebbero sopravvivere
-    al _strip_cot(), ma a volte si nascondono dentro il testo.
+    Looks for typical Chain-of-Thought patterns that shouldn't survive
+    _strip_cot(), but sometimes hide within the text.
     """
     COT_PATTERNS = [
-        r"^\s*(okay|ok|alright|bene|perfetto|certo)[,.]?\s*[\w]",  # frasi di apertura conversazionale
-        r"^(let me|lasciami|vediamo|analizziamo|procedo)\b",        # intro di ragionamento
-        r"<think>",                                                    # tag thinking espliciti
+        r"^\s*(okay|ok|alright|bene|perfetto|certo)[,.]?\s*[\w]",  # conversational opening phrases
+        r"^(let me|lasciami|vediamo|analizziamo|procedo)\b",        # reasoning intro
+        r"<think>",                                                    # explicit thinking tags
         r"</think>",
-        r"^\s*\*\*?(nota|note|avviso|attenzione)\*\*?:",              # meta-note dell'AI
+        r"^\s*\*\*?(nota|note|avviso|attention)\*\*?:",              # AI meta-notes
     ]
     for pattern in COT_PATTERNS:
         if re.search(pattern, text, re.IGNORECASE | re.MULTILINE):
-            return f"Possibile CoT residuo: pattern '{pattern[:30]}...'"
+            return f"Possible residue CoT: pattern '{pattern[:30]}...'"
     return None
 
 
 def _rule_code_blocks_closed(text: str) -> str | None:
-    """I blocchi di codice ``` devono essere aperti e chiusi correttamente."""
+    """The code blocks ``` must be properly opened and closed."""
     count = len(re.findall(r"^```", text, re.MULTILINE))
     if count % 2 != 0:
-        return f"Blocchi di codice non bilanciati ({count} backtick-fence trovati, deve essere pari)"
+        return f"Unbalanced code blocks ({count} backtick-fences found, must be even)"
     return None
 
 
 def _rule_has_correlati_section(text: str) -> str | None:
-    """Il documento deve terminare con la sezione 'Concetti Correlati:'."""
-    if not re.search(r"concetti\s+correlati\s*:", text, re.IGNORECASE):
-        return "Sezione 'Concetti Correlati:' mancante"
+    """The document must end with the 'Related Concepts' section."""
+    if not re.search(r"related\s+concepts\b", text, re.IGNORECASE):
+        return "Missing 'Related Concepts' section"
     return None
 
 
 def _rule_has_wikilinks(text: str) -> str | None:
     """
-    Deve esserci almeno un [[wikilink]].
-    Se non ce ne sono affatto, qualcosa è andato storto con la formattazione.
+    There must be at least one [[wikilink]].
+    If there are none at all, something went wrong with the formatting.
     """
     if not re.search(r"\[\[.+?\]\]", text):
-        return "Nessun [[wikilink]] trovato nel documento"
+        return "No [[wikilinks]] found in the document"
     return None
 
 
 def _rule_minimum_length(text: str, min_words: int = 80) -> str | None:
-    """Output troppo corto è sospetto (risposta troncata o rifiuto silenzioso)."""
+    """Output too short is suspicious (truncated response or silent refusal)."""
     word_count = len(text.split())
     if word_count < min_words:
-        return f"Output troppo corto ({word_count} parole, minimo {min_words})"
+        return f"Output too short ({word_count} words, minimum {min_words})"
     return None
 
 
 def _rule_no_truncation_markers(text: str) -> str | None:
     """
-    Alcuni modelli segnalano la troncatura con frasi tipiche.
+    Some models signal truncation with typical phrases.
     """
     TRUNCATION_PATTERNS = [
-        r"\.\.\.\s*$",                             # termina con "..."
-        r"\[continua\]",
-        r"\[troncato\]",
-        r"(il testo continua|to be continued)",
+        r"\.\.\.\s*$",                             # ends with "..."
+        r"\[continued\]",
+        r"\[truncated\]",
+        r"(the text continues|to be continued)",
         r"(max.{0,20}token|context.{0,20}limit)",
     ]
-    last_500 = text[-500:]  # controlla solo la coda
+    last_500 = text[-500:]  # only check the tail
     for pattern in TRUNCATION_PATTERNS:
         if re.search(pattern, last_500, re.IGNORECASE):
-            return f"Possibile troncatura rilevata: '{pattern}'"
+            return f"Possible truncation detected: '{pattern}'"
     return None
 
 
-# Registro delle regole: (funzione, è_bloccante)
-# Le regole bloccanti causano is_valid=False; quelle non bloccanti producono solo warnings.
+# Rule Registry: (function, is_blocking)
+# Blocking rules cause is_valid=False; non-blocking rules only produce warnings.
 VALIDATION_RULES: list[tuple] = [
     (_rule_has_h1_title,           True),
     (_rule_no_cot_markers,         True),
     (_rule_code_blocks_closed,     True),
     (_rule_has_correlati_section,  True),
-    (_rule_has_wikilinks,          False),   # warning: potrebbe essere legittimamente assente
+    (_rule_has_wikilinks,          False),   # warning: could be legitimately absent
     (_rule_minimum_length,         True),
-    (_rule_no_truncation_markers,  False),   # warning: potrebbe essere stile del modello
+    (_rule_no_truncation_markers,  False),   # warning: could be model style
 ]
 
 
 def validate(text: str) -> ValidationResult:
     """
-    Esegue tutte le regole di validazione e restituisce un ValidationResult.
+    Executes all validation rules and returns a ValidationResult.
     """
     errors   = []
     warnings = []
@@ -158,32 +158,32 @@ def validate(text: str) -> ValidationResult:
 
 
 # ---------------------------------------------------------------------------
-# LIVELLO 2 — PROMPT DI CORREZIONE CHIRURGICA
+# LEVEL 2 — SURGICAL CORRECTION PROMPT
 # ---------------------------------------------------------------------------
 
 def build_correction_prompt(broken_output: str, validation_result: ValidationResult) -> str:
     """
-    Costruisce un prompt mirato che descrive esattamente cosa correggere,
-    allegando l'output malformato e chiedendo SOLO la riparazione.
+    Builds a targeted prompt that describes exactly what to fix,
+    attaching the malformed output and asking ONLY for the repair.
     """
     error_list = "\n".join(f"- {e}" for e in validation_result.errors)
 
-    return f"""Il documento Markdown che hai generato contiene i seguenti problemi strutturali che DEVONO essere corretti:
+    return f"""The Markdown document you generated contains the following structural problems that MUST be corrected:
 
 {error_list}
 
-Di seguito trovi l'output malformato. Restituisci ESCLUSIVAMENTE il documento corretto, senza nessuna spiegazione o commento aggiuntivo. Non ri-analizzare il contenuto originale: correggi solo i problemi elencati sopra mantenendo tutto il resto identico.
+Below is the malformed output. Return EXCLUSIVELY the corrected document, without any additional explanation or comment. Do not re-analyze the original content: only fix the issues listed above keeping everything else identical.
 
---- OUTPUT DA CORREGGERE ---
+--- OUTPUT TO CORRECT ---
 {broken_output}
---- FINE OUTPUT ---"""
+--- END OUTPUT ---"""
 
 
 # ---------------------------------------------------------------------------
-# LIVELLO 3 — QUARANTENA
+# LEVEL 3 — QUARANTINE
 # ---------------------------------------------------------------------------
 
-QUARANTINE_FOLDER = "_quarantena"
+QUARANTINE_FOLDER = "_quarantine"
 
 
 def quarantine(
@@ -195,10 +195,10 @@ def quarantine(
     ai_folder_path: str,
 ) -> None:
     """
-    Salva il chunk problematico in una sottocartella di quarantena con:
-    - Il testo del chunk originale
-    - L'output malformato prodotto dall'AI
-    - Un report diagnostico JSON
+    Saves the problematic chunk in a quarantine subfolder with:
+    - The original chunk text
+    - The malformed output produced by the AI
+    - A JSON diagnostic report
     """
     quarantine_path = os.path.join(ai_folder_path, QUARANTINE_FOLDER)
     os.makedirs(quarantine_path, exist_ok=True)
@@ -207,15 +207,15 @@ def quarantine(
     base_label = re.sub(r"[\\/:*?\"<>|'\s]", "_", chunk_label)[:50]
     prefix     = f"{timestamp}_{base_label}"
 
-    # 1. Salva il testo originale del chunk
+    # 1. Save original chunk text
     with open(os.path.join(quarantine_path, f"{prefix}_INPUT.txt"), "w", encoding="utf-8") as f:
         f.write(chunk_text)
 
-    # 2. Salva l'output malformato
+    # 2. Save malformed output
     with open(os.path.join(quarantine_path, f"{prefix}_OUTPUT.md"), "w", encoding="utf-8") as f:
-        f.write(broken_output or "(output vuoto)")
+        f.write(broken_output or "(empty output)")
 
-    # 3. Salva il report diagnostico
+    # 3. Save diagnostic report
     report = {
         "timestamp":        timestamp,
         "source_file":      original_file_path,
@@ -227,11 +227,11 @@ def quarantine(
     with open(os.path.join(quarantine_path, f"{prefix}_REPORT.json"), "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
-    print(f"  🔴 In quarantena: {prefix}_*.* (vedi {QUARANTINE_FOLDER}/)")
+    print(f"  🔴 Quarantined: {prefix}_*.* (see {QUARANTINE_FOLDER}/)")
 
 
 # ---------------------------------------------------------------------------
-# INTERFACCIA PRINCIPALE — da usare in brain.py
+# MAIN INTERFACE — to be used in brain.py
 # ---------------------------------------------------------------------------
 
 def validate_and_retry(
@@ -239,75 +239,75 @@ def validate_and_retry(
     initial_output: str | None,
     label: str,
     original_file_path: str,
-    call_ai_fn,          # passa la funzione call_ai di brain.py
+    call_ai_fn,          # pass brain.py's call_ai function
     ai_folder_path: str,
     max_retries: int = 2,
-    **kwargs            # argomenti extra per call_ai_fn (es. images)
+    **kwargs            # extra arguments for call_ai_fn (e.g. images)
 ) -> str | None:
     """
-    Orchestratore principale del sistema di validazione.
+    Main orchestrator of the validation system.
 
-    Flusso:
-      1. Valida l'output iniziale.
-      2. Se valido → restituisce subito.
-      3. Se invalido → costruisce un prompt di correzione e richiama call_ai_fn.
-      4. Ripete fino a max_retries volte.
-      5. Se ancora invalido → mette in quarantena e restituisce None.
+    Flow:
+      1. Validates the initial output.
+      2. If valid → returns immediately.
+      3. If invalid → builds a correction prompt and calls call_ai_fn.
+      4. Repeats up to max_retries times.
+      5. If still invalid → puts in quarantine and returns None.
 
     Args:
-        chunk_text:         Il testo originale del chunk (per la quarantena).
-        initial_output:     La risposta grezza dell'AI (può essere None).
-        label:              Etichetta leggibile del chunk (per i log).
-        original_file_path: Path del file sorgente (per la quarantena).
-        call_ai_fn:         Callable con firma call_ai(content, label, **kwargs) → str|None.
-        ai_folder_path:     Path della cartella Z_Cervello_IA.
-        max_retries:        Numero massimo di tentativi di correzione.
-        **kwargs:           Argomenti extra passati a call_ai_fn.
+        chunk_text:         Original chunk text (for quarantine).
+        initial_output:     Raw AI response (can be None).
+        label:              Readable chunk label (for logs).
+        original_file_path: Source file path (for quarantine).
+        call_ai_fn:         Callable with signature call_ai(content, label, **kwargs) → str|None.
+        ai_folder_path:     Path of the Z_AI_Cerebrum folder.
+        max_retries:        Maximum number of correction attempts.
+        **kwargs:           Extra arguments passed to call_ai_fn.
 
     Returns:
-        Il testo validato, oppure None se irrecuperabile.
+        The validated text, or None if unrecoverable.
     """
     current_output = initial_output
 
-    for attempt in range(max_retries + 1):  # tentativo 0 = validazione dell'output iniziale
+    for attempt in range(max_retries + 1):  # attempt 0 = validation of initial output
 
-        # --- Gestione output None ---
+        # --- Handle None output ---
         if current_output is None:
             if attempt == max_retries:
-                print(f"  ❌ Output None dopo {max_retries} retry su '{label}' → quarantena")
+                print(f"  ❌ Output None after {max_retries} retries on '{label}' → quarantine")
                 quarantine(original_file_path, label, chunk_text, "", 
-                           ValidationResult(False, ["Output API None"]), ai_folder_path)
+                           ValidationResult(False, ["API Output None"]), ai_folder_path)
                 return None
-            print(f"  ⚠️  Output None al tentativo {attempt}, riprovo da zero...")
+            print(f"  ⚠️  Output None at attempt {attempt}, retrying from scratch...")
             current_output = call_ai_fn(chunk_text, label, **kwargs)
             time.sleep(10)
             continue
 
-        # --- Validazione ---
+        # --- Validation ---
         result = validate(current_output)
 
         if result.warnings:
-            print(f"  ⚡ Avvisi (non bloccanti) su '{label}': {'; '.join(result.warnings)}")
+            print(f"  ⚡ Warnings (non-blocking) on '{label}': {'; '.join(result.warnings)}")
 
         if result.is_valid:
             if attempt > 0:
-                print(f"  ✅ Corretto con successo al tentativo {attempt} su '{label}'")
+                print(f"  ✅ Successfully corrected at attempt {attempt} on '{label}'")
             return current_output
 
-        # --- Output invalido ---
-        print(f"  ⚠️  Validazione fallita (tentativo {attempt}/{max_retries}) su '{label}': {result}")
+        # --- Invalid output ---
+        print(f"  ⚠️  Validation failed (attempt {attempt}/{max_retries}) on '{label}': {result}")
 
         if attempt == max_retries:
-            print(f"  ❌ Irrecuperabile dopo {max_retries} retry → quarantena")
+            print(f"  ❌ Unrecoverable after {max_retries} retries → quarantine")
             quarantine(original_file_path, label, chunk_text, current_output, result, ai_folder_path)
             return None
 
-        # --- Costruisci il prompt di correzione e riprova ---
+        # --- Build correction prompt and retry ---
         correction_prompt = build_correction_prompt(current_output, result)
-        print(f"  🔧 Invio prompt di correzione chirurgica (tentativo {attempt + 1}/{max_retries})...")
+        print(f"  🔧 Sending surgical correction prompt (attempt {attempt + 1}/{max_retries})...")
         time.sleep(5)
-        # Per la correzione chirurgica NON passiamo le immagini (kwargs), 
-        # perché lavoriamo solo sul testo malformato.
-        current_output = call_ai_fn(correction_prompt, f"{label} [correzione {attempt + 1}]")
+        # For surgical correction we do NOT pass images (kwargs),
+        # because we are only working on the malformed text.
+        current_output = call_ai_fn(correction_prompt, f"{label} [correction {attempt + 1}]")
 
-    return None  # non raggiungibile, ma rende mypy felice
+    return None

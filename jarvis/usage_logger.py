@@ -32,6 +32,36 @@ def log_usage(model_name, prompt_tokens, completion_tokens, task_type="analysis"
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
 
+def get_model_usage_stats():
+    """Ritorna le statistiche di utilizzo per modello per il giorno corrente."""
+    log_file = "ai_usage_history.jsonl"
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    # Limiti Free Tier stimati (RPD - Requests Per Day)
+    limits = {
+        "gemini-3.1-pro-preview": 50,
+        "gemini-3.5-flash": 1500,
+        "gemini-3-flash-preview": 1500,
+        "gemini-3.1-flash-lite": 1500,
+        "gemini-1.5-flash": 1500
+    }
+    
+    usage = {model: {"requests": 0, "limit": limit} for model, limit in limits.items()}
+    
+    if os.path.exists(log_file):
+        with open(log_file, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    data = json.loads(line)
+                    if data["timestamp"].startswith(today):
+                        model = data["model"]
+                        if model in usage:
+                            usage[model]["requests"] += 1
+                except:
+                    continue
+                    
+    return usage
+
 def get_today_stats():
     """Ritorna un riassunto dei costi di oggi."""
     log_file = "ai_usage_history.jsonl"

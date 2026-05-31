@@ -1,0 +1,52 @@
+# autobrain_core/doctor.py
+import os
+import shutil
+import platform
+import sys
+
+class GitNexusDoctor:
+    COMMON_WINDOWS_PATHS = [
+        r"C:\Program Files\Git\bin",
+        r"C:\Program Files\Git\cmd",
+        r"C:\Program Files (x86)\Git\bin",
+        r"C:\Program Files (x86)\Git\cmd",
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Git\bin"),
+        os.path.expandvars(r"%USERPROFILE%\bin"),
+    ]
+
+    @staticmethod
+    def validate_git():
+        """Checks if git is available, attempts to heal the PATH if not."""
+        if shutil.which("git"):
+            return True
+        
+        if platform.system() == "Windows":
+            return GitNexusDoctor._attempt_path_healing()
+        
+        return False
+
+    @staticmethod
+    def _attempt_path_healing():
+        """Scans common directories for git.exe and updates the current PATH."""
+        for path in GitNexusDoctor.COMMON_WINDOWS_PATHS:
+            git_path = os.path.join(path, "git.exe")
+            if os.path.exists(git_path):
+                os.environ["PATH"] += os.pathsep + path
+                return True
+        return False
+
+    @staticmethod
+    def handle_exception(exc):
+        """Standardized error reporting for WinError 2."""
+        if isinstance(exc, FileNotFoundError) or (isinstance(exc, OSError) and getattr(exc, 'winerror', 0) == 2) or "WinError 2" in str(exc):
+            print("\n" + "="*50)
+            print("⚠️  GITNEXUS DOCTOR: Dependency Missing")
+            print("="*50)
+            print("Git executable not found in your PATH.")
+            print(f"Searched in: {', '.join(GitNexusDoctor.COMMON_WINDOWS_PATHS[:3])}...")
+            print("\nPROPOSED ACTION:")
+            print("1. Please install Git: https://git-scm.com/download/win")
+            print("2. Or manually provide the path using: nexus setup --git-path <path>")
+            print("="*50 + "\n")
+            sys.exit(1)
+        raise exc

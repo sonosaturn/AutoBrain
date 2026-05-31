@@ -23,15 +23,6 @@ possible_paths = [
     os.path.join(user_profile, ".gemini", "tmp", "desktop", "chats"),
 ]
 
-CLI_CHATS_PATH = None
-for p in possible_paths:
-    if os.path.exists(p):
-        CLI_CHATS_PATH = p
-        break
-
-if not CLI_CHATS_PATH:
-    CLI_CHATS_PATH = os.path.join(user_profile, ".gemini", "tmp", user_name, "chats") # Fallback
-
 def parse_cli_content(content):
     if isinstance(content, list):
         text = "".join([part.get("text", "") for part in content if "text" in part])
@@ -41,7 +32,6 @@ def parse_cli_content(content):
         return ""
 
     # Rimuove blocchi di "Content from referenced files" che sporcano il log
-    # Questi blocchi iniziano con '--- Content from referenced files ---' e finiscono con '--- End of content ---'
     text = re.sub(r'--- Content from referenced files ---.*?--- End of content ---', 
                   '[Contenuto tecnico rimosso per pulizia]', 
                   text, 
@@ -57,59 +47,65 @@ def parse_cli_content(content):
 
 def auto_extract_cli_history():
     """Scansiona i log della CLI e li converte in Markdown nel vault."""
-    if not CONVO_VAULT_PATH or not os.path.exists(CLI_CHATS_PATH):
+    if not CONVO_VAULT_PATH:
         return
 
-    files = [f for f in os.listdir(CLI_CHATS_PATH) if f.endswith(".jsonl")]
-    if not files: return
+    gemini_folder = os.path.join(CONVO_VAULT_PATH, "Gemini")
+    os.makedirs(gemini_folder, exist_ok=True)
 
-    print(f"🔄 Controllo nuove sessioni CLI in: {CLI_CHATS_PATH}")
-    
-    for filename in files:
-        filepath = os.path.join(CLI_CHATS_PATH, filename)
-        
-        # Estrazione ID sessione (l'ultima parte dopo l'ultimo trattino prima di .jsonl)
-        # Formato tipico: session-2026-05-19T13-02-3559c161.jsonl
-        session_id = filename.split('-')[-1].replace(".jsonl", "")
-        
-        try:
-            match = re.search(r"(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})", filename)
-            if match:
-                year, month, day, hour, minute = match.groups()
-                timestamp = f"{day}-{month}-{year}_{hour}-{minute}"
-            else:
-                timestamp = datetime.fromtimestamp(os.path.getctime(filepath)).strftime("%d-%m-%Y_%H-%M")
-        except:
-            timestamp = "unknown"
-
-        output_filename = f"Conversazione_CLI_{timestamp}_{session_id[:8]}.md"
-        output_path = os.path.join(CONVO_VAULT_PATH, output_filename)
-
-        if os.path.exists(output_path):
+    for chats_path in possible_paths:
+        if not os.path.exists(chats_path):
             continue
 
-        messages = []
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                for line in f:
-                    data = json.loads(line)
-                    m_type = data.get("type")
-                    if m_type in ["user", "gemini"]:
-                        content = parse_cli_content(data.get("content", ""))
-                        if content.strip():
-                            if m_type == "user":
-                                role = "👤 Tu"
-                                messages.append(f"### {role}\n{content.strip()}")
-                            else:
-                                role = "🧠 IA (CLI) - Riassunto"
-                                summarized = summarize_ai_response(content.strip())
-                                messages.append(f"### {role}\n{summarized}")
-        except Exception as e:
-            print(f"  ⚠️ Errore lettura log {filename}: {e}")
-            continue
+        files = [f for f in os.listdir(chats_path) if f.endswith(".jsonl")]
+        if not files: continue
 
-        if messages:
-            with open(output_path, "w", encoding="utf-8") as f:
-                f.write(f"# Sessione Gemini CLI - {timestamp.replace('_', ' ')}\n\n")
-                f.write("\n\n".join(messages))
-            print(f"  ✅ Nuova sessione CLI sincronizzata: {output_filename}")
+        print(f"🔄 Controllo nuove sessioni CLI in: {chats_path}")
+        
+        for filename in files:
+            filepath = os.path.join(chats_path, filename)
+            
+            # Estrazione ID sessione
+            session_id = filename.split('-')[-1].replace(".jsonl", "")
+            
+            try:
+                match = re.search(r"(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})", filename)
+                if match:
+                    year, month, day, hour, minute = match.groups()
+                    timestamp = f"{day}-{month}-{year}_{hour}-{minute}"
+                else:
+                    timestamp = datetime.fromtimestamp(os.path.getctime(filepath)).strftime("%d-%m-%Y_%H-%M")
+            except:
+                timestamp = "unknown"
+
+            output_filename = f"Conversazione_CLI_{timestamp}_{session_id[:8]}.md"
+            output_path = os.path.join(gemini_folder, output_filename)
+
+            if os.path.exists(output_path):
+                continue
+
+            messages = []
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    for line in f:
+                        data = json.loads(line)
+                        m_type = data.get("type")
+                        if m_type in ["user", "gemini"]:
+                            content = parse_cli_content(data.get("content", ""))
+                            if content.strip():
+                                if m_type == "user":
+                                    role = "👤 Tu"
+                                    messages.append(f"### {role}\n{content.strip()}")
+                                else:
+                                    role = "🧠 IA (CLI) - Riassunto"
+                                    summarized = summarize_ai_response(content.strip())
+                                    messages.append(f"### {role}\n{summarized}")
+            except Exception as e:
+                print(f"  ⚠️ Errore lettura log {filename}: {e}")
+                continue
+
+            if messages:
+                with open(output_path, "w", encoding="utf-8") as f:
+                    f.write(f"# Sessione Gemini CLI - {timestamp.replace('_', ' ')}\n\n")
+                    f.write("\n\n".join(messages))
+                print(f"  ✅ Nuova sessione CLI sincronizzata: {output_filename}")

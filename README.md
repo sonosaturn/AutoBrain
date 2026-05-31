@@ -106,6 +106,22 @@ To swap models, update the global variables in `jarvis/jarvis_engine.py` and `ja
 - **Self-Healing (Repair):** Defaults to every **2 hours**. Change this in `jarvis/creative_leader.py`.
 - **Innovation (Creative):** Defaults to every **24 hours**. Change this in `jarvis/creative_leader.py`.
 
+## Localizzazione e Personalizzazione
+
+AutoBrain è progettato per essere un progetto di standard internazionale ma con un'anima italiana.
+
+### Lingua del Progetto
+- **Codice e Documentazione:** Scrittti in **Inglese** per garantire la massima portabilità e leggibilità da parte della community globale di sviluppatori.
+- **Interazione Utente (Jarvis):** Pre-configurata in **Italiano**. Jarvis capisce i comandi in italiano e risponde in italiano.
+
+### Come cambiare lingua
+Se desideri personalizzare AutoBrain per un'altra lingua:
+1. **Comandi Vocali:** Modifica il `SYSTEM_PROMPT` in `jarvis/intent_parser.py` traducendo le istruzioni nella tua lingua preferita.
+2. **Risposte di Jarvis:** Modifica la `system_instruction` in `jarvis/jarvis_engine.py` e il `SYSTEM_PROMPT` in `autobrain_core/brain.py`.
+3. **Riconoscimento Vocale (STT):** Se usi Vosk offline, scarica il modello della tua lingua dal [sito ufficiale di Vosk](https://alphacephei.com/vosk/models) e aggiorna il percorso in `jarvis/main.py`.
+
+---
+
 ## 📊 Observability & Monitoring
 
 AutoBrain includes a built-in observability dashboard powered by **CodeBurn**.

@@ -1,3 +1,5 @@
 {"timestamp": "2026-05-18 23:49:53", "model": "gemini-3-flash-preview", "task": "jarvis_query", "prompt_tokens": 129, "completion_tokens": 103, "total_tokens": 232, "estimated_cost_usd": 5.4e-05}
 {"timestamp": "2026-05-21 02:34:25", "model": "gemini-3-flash-preview", "task": "jarvis_query", "prompt_tokens": 158, "completion_tokens": 114, "total_tokens": 272, "estimated_cost_usd": 6.1e-05}
 {"timestamp": "2026-05-21 02:35:39", "model": "gemini-3-flash-preview", "task": "jarvis_query", "prompt_tokens": 177, "completion_tokens": 114, "total_tokens": 291, "estimated_cost_usd": 6.3e-05}
+{"timestamp": "2026-05-28 22:53:45", "model": "gemini-3-flash-preview", "task": "jarvis_university_tutor", "prompt_tokens": 239, "completion_tokens": 953, "total_tokens": 1192, "estimated_cost_usd": 0.000405}
+{"timestamp": "2026-05-29 00:08:57", "model": "gemini-3-flash-preview", "task": "jarvis_university_tutor", "prompt_tokens": 43562, "completion_tokens": 835, "total_tokens": 44397, "estimated_cost_usd": 0.00469}
