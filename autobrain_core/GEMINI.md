@@ -1,27 +1,42 @@
-# 🧠 Integrità Architetturale (GitNexus)
+# 🧠 Brain Core Instructions
 
-**MANDATORIO:** Per ogni modifica che non sia una correzione di bug triviale, DEVI utilizzare GitNexus per preservare la struttura "Hub & Spoke" del progetto.
-
-- **Prima di modificare un simbolo:** Esegui `gitnexus_impact` per valutare il "blast radius". Se il rischio è ALTO (molte dipendenze), chiedi conferma all'utente.
-- **Per capire i flussi:** Usa `gitnexus_query` per visualizzare come i dati fluiscono tra i moduli prima di aggiungere nuove logiche.
-- **Post-Modifica:** Verifica che i nuovi collegamenti non creino accoppiamenti circolari tra i moduli (es. Jarvis non deve dipendere direttamente dalle logiche interne del Brain, ma passare attraverso le API definite).
-
----
-
-# 🛰️ Protocollo di Delega (Dispatch Queue)
-
-**MANDATORIO AD OGNI AVVIO:** Controlla la sottocartella `_Dispatch_Queue` all'interno del tuo `CONVO_VAULT_PATH`. 
-- Se trovi file con `stato: pendente`, prendili in carico immediatamente.
-- Esegui il bug fixing o lo sviluppo richiesto.
-- Una volta finito, aggiorna il file Markdown cambiando lo stato in `completato` e aggiungendo il riassunto della soluzione.
+## Engineering Standards
+- **MANDATORY**: Adhere to the root [[GEMINI.md]] standards.
+- **Disaccoppiamento**: Il Core non deve conoscere l'esistenza dell'interfaccia di Jarvis. Espone solo API e metodi di gestione del grafo e dei documenti.
+- **Performance**: Ogni modifica al Knowledge Graph deve essere preceduta da un'analisi di impatto sulle performance di indicizzazione.
+- **AI Folder**: `Z_AI_Cerebrum` (contains all AI-generated analysis).
+- **Quarantine**: `_quarantine` (inside the AI folder).
+- **Source PDFs**: `_PDF_Sources` (for raw document input).
+- **Analysis Section**: `## Related Concepts` (at the end of every analysis note).
+- **Analysis Prefix**: `Analysis_` (for generated filenames).
 
 ---
 
-# 🛠️ Istruzioni Critiche Modelli
+# 🧠 Architectural Integrity (GitNexus)
 
-**NON USARE ALTRI NOMI.** In ogni chiamata API o configurazione di agenti, usa esclusivamente questi:
-- **`gemini-3.1-flash-lite`**: Per task veloci, automazione e interazione vocale.
-- **`gemini-3-flash-preview`**: Per analisi profonde, riassunti e ragionamento complesso.
+**MANDATORY:** For every modification that is not a trivial bug fix, you MUST use GitNexus to preserve the "Hub & Spoke" structure of the project.
+
+- **Before modifying a symbol:** Run `gitnexus_impact` to evaluate the "blast radius". If the risk is HIGH (many dependencies), ask the user for confirmation.
+- **To understand flows:** Use `gitnexus_query` to visualize how data flows between modules before adding new logic.
+- **Post-Modification:** Verify that new links do not create circular couplings between modules (e.g., Jarvis must not depend directly on Brain's internal logic, but go through defined APIs).
+
+---
+
+# 🛰️ Delegation Protocol (Dispatch Queue)
+
+**MANDATORY AT EVERY START:** Check the `_Dispatch_Queue` subfolder inside your `CONVO_VAULT_PATH`. 
+- If you find files with `status: pending`, take them on immediately.
+- Perform the requested bug fixing or development.
+- Once finished, update the Markdown file by changing the status to `completed` and adding a summary of the solution.
+
+---
+
+# 🛠️ Critical Model Instructions
+
+DO NOT USE OTHER NAMES. In every API call or agent configuration, use exclusively these:
+- **`gemini-3.1-flash-lite`**: For fast tasks, automation, and voice interaction.
+- **`gemini-3.5-flash`**: For analysis, summaries, and complex reasoning (current standard).
+- **`gemini-3-flash-preview`**: Legacy support for deep analysis if needed.
 
 ---
 

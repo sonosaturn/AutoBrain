@@ -1,7 +1,11 @@
 import os
 import webbrowser
 import subprocess
+import logging
 from spotify_handler import spotify_manager
+
+# Inizializza il logger per questo modulo
+logger = logging.getLogger("jarvis.executor")
 
 def execute_command(command: dict):
     """
@@ -78,7 +82,7 @@ def execute_command(command: dict):
             os.system(f"start {filepath}")
             return f"Le ho inviato il documento testuale sullo schermo, signore."
         except Exception as e:
-            print(f"⚠️ Errore apertura testo: {e}")
+            logger.error(f"Errore apertura testo: {e}")
             return "Non sono riuscito a generare il documento testuale."
 
     elif azione == "messaggio":
@@ -89,5 +93,6 @@ def execute_command(command: dict):
         return "Comando non riconosciuto dal modulo di esecuzione."
 
 if __name__ == "__main__":
-    # Test
+    # In un ambiente di test standalone, configuriamo un logger di base
+    logging.basicConfig(level=logging.INFO)
     print(execute_command({"azione": "cerca_youtube", "parametro": "Eminem"}))

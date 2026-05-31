@@ -2,14 +2,25 @@ import os
 import json
 import logging
 import sys
+import time
+import random
+import py_compile
+import shutil
+import subprocess
+from google.genai import types
 
 # Modular Import Logic
 try:
     from core_utils import Config, models
+    from autobrain_core.email_engine import cerca_email_importanti
 except ImportError:
     # Fallback for transition phase
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from core_utils import Config, models
+    from autobrain_core.email_engine import cerca_email_importanti
+
+# Inizializza il logger per questo modulo
+logger = logging.getLogger("jarvis.engine")
 
 # MANDATORY MODEL NAMES (From Hub)
 VOICE_MODEL = Config.VOICE_MODEL
@@ -21,7 +32,9 @@ client = models.client
 # "HANDS" - DEVELOPMENT TOOLS (For Agents)
 # ---------------------------------------------------------------------------
 
-BASE_DIR = Config.JARVIS_DIR
+# Folders
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = str(Config.JARVIS_DIR)
 
 def _resolve_path(file_path: str):
     """Resolves and validates paths to avoid system errors or access outside the project folder."""
@@ -34,25 +47,23 @@ def _resolve_path(file_path: str):
         raise PermissionError(f"Access denied: Cannot operate outside of {BASE_DIR}")
     return abs_path
 
-import py_compile
-import shutil
-import subprocess
-
 def gitnexus_query(query_text: str):
     """Queries the project architecture using GitNexus."""
     try:
-        # We use --skip-git since the project structure might not be a standard git repo in all environments
-        result = subprocess.run(["gitnexus", "query", query_text, "--skip-git"], capture_output=True, text=True, check=True)
+        # Eseguiamo npx gitnexus dalla root del progetto
+        result = subprocess.run(["npx", "gitnexus", "query", query_text], capture_output=True, text=True, check=True, shell=True, cwd=PROJECT_ROOT)
         return result.stdout
     except Exception as e:
+        logger.error(f"GitNexus Query Error: {e}")
         return f"❌ GitNexus Query Error: {e}"
 
 def gitnexus_impact(symbol_name: str):
     """Analyzes the impact (blast radius) of modifying a specific symbol."""
     try:
-        result = subprocess.run(["gitnexus", "impact", "--target", symbol_name, "--direction", "upstream", "--skip-git"], capture_output=True, text=True, check=True)
+        result = subprocess.run(["npx", "gitnexus", "impact", "--target", symbol_name, "--direction", "upstream"], capture_output=True, text=True, check=True, shell=True, cwd=PROJECT_ROOT)
         return result.stdout
     except Exception as e:
+        logger.error(f"GitNexus Impact Error: {e}")
         return f"❌ GitNexus Impact Error: {e}"
 
 def scrivi_codice(file_path: str, contenuto: str):
@@ -80,8 +91,10 @@ def scrivi_codice(file_path: str, contenuto: str):
             except py_compile.PyCompileError as e:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
+                logger.error(f"Syntax Error in generated code for {file_path}: {e.msg}")
                 return f"❌ Syntax Error in generated code: {e.msg}. File not updated."
             except Exception as e:
+                logger.error(f"Validation error for {file_path}: {e}")
                 return f"❌ Validation error: {e}"
         else:
             # Direct write for other files
@@ -90,6 +103,7 @@ def scrivi_codice(file_path: str, contenuto: str):
             return f"✅ File {file_path} written successfully."
             
     except Exception as e:
+        logger.error(f"File writing error: {e}")
         return f"❌ File writing error: {e}"
 
 def leggi_codice(file_path: str):
@@ -101,17 +115,19 @@ def leggi_codice(file_path: str):
         with open(abs_path, "r", encoding="utf-8") as f:
             return f.read()
     except Exception as e:
+        logger.error(f"File reading error for {file_path}: {e}")
         return f"❌ File reading error: {e}"
 
+def leggi_email(query_filtro: str = "esame"):
+    """Permette all'agente di leggere le email importanti dell'utente."""
+    return cerca_email_importanti(query_filtro)
+
 # Available tools for the model
-tools = [scrivi_codice, leggi_codice, gitnexus_query, gitnexus_impact]
+tools = [scrivi_codice, leggi_codice, gitnexus_query, gitnexus_impact, leggi_email]
 
 # ---------------------------------------------------------------------------
 # AGENTIC CORE (NATIVE)
 # ---------------------------------------------------------------------------
-
-import time
-import random
 
 def delega_alla_cli(obiettivo: str, errore_precedente: str = ""):
     """Writes a task file in the dispatch queue for the Gemini CLI."""
@@ -145,8 +161,10 @@ created: {timestamp}
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(contenuto)
             
+        logger.info(f"Task delegated to Gemini CLI. Task file: {file_path}")
         return f"🛰️ Task delegated to Gemini CLI. File ready at {file_path}. Inform Lorenzo."
     except Exception as e:
+        logger.error(f"Error during delegation: {e}")
         return f"❌ Error during delegation: {e}"
 
 def agente_sviluppatore(obiettivo: str):
@@ -155,14 +173,14 @@ def agente_sviluppatore(obiettivo: str):
     ultimo_errore = ""
     
     system_instruction = (
-        "You are the Jarvis Senior Developer. Your goal is to analyze and write Python code. "
-        "MANDATORY: Before modifying any function or class, you MUST run 'gitnexus_impact' to understand the blast radius. "
-        "Use 'gitnexus_query' to explore the architecture and 'leggi_codice' to read files. "
-        "Use 'scrivi_codice' to implement fixes. Proceed step-by-step. Be concise and professional."
+        "Sei il Senior Developer di Jarvis. Il tuo obiettivo è analizzare e scrivere codice Python. "
+        "MANDATORIO: Prima di modificare qualsiasi funzione o classe, DEVI eseguire 'gitnexus_impact' per capire il raggio d'azione delle modifiche. "
+        "Usa 'gitnexus_query' per esplorare l'architettura e 'leggi_codice' per leggere i file. "
+        "Usa 'scrivi_codice' per implementare le correzioni. Procedi passo dopo passo. Sii conciso e professionale."
     )
 
     for current_model in models_to_try:
-        print(f"\n👨‍💻 [DEVELOPER AGENT] Attempting with model: {current_model}")
+        logger.info(f"Attempting development goal with model: {current_model}")
         contents = [types.Content(role="user", parts=[types.Part.from_text(text=obiettivo)])]
         
         config = types.GenerateContentConfig(
@@ -212,6 +230,16 @@ def agente_sviluppatore(obiettivo: str):
                         },
                         "required": ["symbol_name"]
                     }
+                ),
+                types.FunctionDeclaration(
+                    name="leggi_email",
+                    description="Legge le email importanti dell'utente cercando parole chiave come 'esame' o 'prenotazione'.",
+                    parameters={
+                        "type": "OBJECT",
+                        "properties": {
+                            "query_filtro": {"type": "STRING"}
+                        }
+                    }
                 )
             ])]
         )
@@ -219,9 +247,9 @@ def agente_sviluppatore(obiettivo: str):
         try:
             # Reasoning loop (max 5 iterations)
             for i in range(5):
-                # Internal retry for temporary errors (e.g., 503)
+                # Internal retry for temporary errors (e.g., 503, 429)
                 retry_count = 0
-                max_retries = 3
+                max_retries = 5
                 success = False
                 response = None
                 
@@ -236,11 +264,11 @@ def agente_sviluppatore(obiettivo: str):
                         break 
                     except Exception as e:
                         ultimo_errore = str(e)
-                        if ("503" in ultimo_errore or "429" in ultimo_errore) and retry_count < max_retries - 1:
-                            retry_count += 1
-                            wait_time = (2 ** retry_count) + random.random()
-                            print(f"⚠️ Model overloaded. Next attempt in {wait_time:.1f}s...")
+                        if ("503" in ultimo_errore or "429" in ultimo_errore or "RESOURCE_EXHAUSTED" in ultimo_errore) and retry_count < max_retries - 1:
+                            wait_time = (2 ** retry_count) * 5 + random.random()
+                            logger.warning(f"Model busy (429/503). Retrying in {wait_time:.1f}s (attempt {retry_count+1}/{max_retries})...")
                             time.sleep(wait_time)
+                            retry_count += 1
                         else:
                             break 
 
@@ -255,14 +283,22 @@ def agente_sviluppatore(obiettivo: str):
                     if part.function_call:
                         fn_name = part.function_call.name
                         args = part.function_call.args
-                        print(f"🛠️ [ACTION] Executing {fn_name}...")
+                        logger.info(f"Executing tool: {fn_name}")
                         
                         if fn_name == "scrivi_codice":
                             result_text = scrivi_codice(**args)
                         elif fn_name == "leggi_codice":
                             result_text = leggi_codice(**args)
+                        elif fn_name == "gitnexus_query":
+                            result_text = gitnexus_query(**args)
+                        elif fn_name == "gitnexus_impact":
+                            result_text = gitnexus_impact(**args)
+                        elif fn_name == "leggi_email":
+                            result_text = leggi_email(**args)
+                        else:
+                            result_text = f"❌ Error: Tool {fn_name} not implemented."
                         
-                        print(f"📡 [RESULT] {result_text[:50]}...")
+                        logger.info(f"Tool result: {result_text[:50]}...")
                         tool_results.append(types.Part.from_function_response(
                             name=fn_name,
                             response={"result": result_text}
@@ -275,16 +311,17 @@ def agente_sviluppatore(obiettivo: str):
 
         except Exception as e:
             ultimo_errore = str(e)
-            print(f"🚨 Error with {current_model}: {ultimo_errore}")
+            logger.error(f"Error with {current_model}: {ultimo_errore}")
             if current_model == BRAIN_MODEL:
-                print("🔄 Attempting fallback to Lite model...")
+                logger.info("Attempting fallback to Lite model...")
                 continue
             
     # If we reach here, both models failed. Delegate to CLI.
-    print("🛰️ [SYSTEM] Total failure of local agents. Activating CLI DELEGATION protocol...")
+    logger.critical("Total failure of local agents. Activating CLI DELEGATION protocol.")
     return delega_alla_cli(obiettivo, ultimo_errore)
 
 if __name__ == "__main__":
-    # Test logic
+    # In un ambiente di test standalone, configuriamo un logger di base
+    logging.basicConfig(level=logging.INFO)
     # print(agente_sviluppatore("Create a test_jarvis.py file with a greeting"))
     pass

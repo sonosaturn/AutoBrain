@@ -10,6 +10,7 @@ class Config:
     # API Keys
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+    JARVIS_API_KEY = os.getenv("JARVIS_API_KEY", "jarvis_default_secret_2026") # Default for safety
 
     # Vault Paths
     VAULT_PATH = os.getenv("VAULT_PATH")
@@ -17,7 +18,7 @@ class Config:
 
     # Models (Standard 2026 names)
     VOICE_MODEL = "gemini-3.1-flash-lite"
-    BRAIN_MODEL = "gemini-3-flash-preview"
+    BRAIN_MODEL = "gemini-3.1-flash-lite"
 
     # Folders
     CORE_DIR = ROOT_DIR / "autobrain_core"

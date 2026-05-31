@@ -1,7 +1,15 @@
 <!-- gitnexus:start -->
-# GitNexus — Code Intelligence
+# 🤖 Jarvis-Specific Instructions
 
-This project is indexed by GitNexus as **jarvis** (188 symbols, 221 relationships, 2 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+## Engineering Standards
+- **MANDATORY**: Adhere to the root [[GEMINI.md]] standards.
+- **Logging**: Use `logger = logging.getLogger("jarvis.module_name")`. Ensure logs are routed to `logs/jarvis_structured.jsonl`.
+- **API**: All frontend-backend communication must include the `X-API-Key` header.
+- **GitNexus**: Use `gitnexus_query` to understand the flow before proposing changes to `jarvis_engine.py` or `main.py`.
+
+## Architectural Rules
+- Jarvis is an interface. Do not bloat it with heavy data processing logic; delegate that to `autobrain_core`.
+- Maintain the WebSocket connection as the single source of truth for the system state (`IDLE`, `LISTENING`, `THINKING`, `SPEAKING`).
 
 > If any GitNexus tool warns the index is stale, run `gitnexus analyze . --index-only` in terminal first.
 
